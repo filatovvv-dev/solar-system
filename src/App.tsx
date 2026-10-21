@@ -426,14 +426,33 @@ function App() {
     setTimeout(() => { isDragging.current = false; }, 50);
   };
 
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom(prev => Math.max(0.15, Math.min(6, prev * delta)));
+    const oldZoom = zoomRef.current;
+    const newZoom = Math.max(0.15, Math.min(6, oldZoom * delta));
+    const k = newZoom / oldZoom;
+    
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    
+    setZoom(newZoom);
+    setOffsetX(prev => (mouseX - centerX) * (1 - k) + k * prev);
+    setOffsetY(prev => (mouseY - centerY) * (1 - k) + k * prev);
   };
 
   const formatDistance = (distance: number): string => {
-    if (distance >= 1000) return `${(distance / 1000).toFixed(1)} млрд км`;
+    if (distance >= 1000000) return `${(distance / 1000000).toFixed(2)} трлн км`;
+    if (distance >= 1000) return `${(distance / 1000).toFixed(2)} млрд км`;
     return `${distance.toFixed(1)} млн км`;
   };
 
