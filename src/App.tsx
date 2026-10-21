@@ -79,8 +79,10 @@ function App() {
   ) => {
     // Moon orbit radius scales with zoom and parent size
     const moonOrbitRadius = (parentSize + 8 + moonIdx * 7) * Math.max(0.7, currentZoom * 0.8);
-    // Much slower moon speed: divide by larger factor
-    const moonAngularSpeed = (2 * Math.PI) / (moon.orbitalPeriod * 200);
+    // Speed slows down dramatically when zoomed in: divide by zoom^1.5
+    // Base factor 500 + zoom scaling ensures moons are catchable at any zoom
+    const zoomSlowdown = Math.pow(currentZoom, 1.5);
+    const moonAngularSpeed = (2 * Math.PI) / (moon.orbitalPeriod * 500 * zoomSlowdown);
     const moonAngle = time * moonAngularSpeed + moonIdx * 1.5; // offset each moon
     return {
       x: parentX + Math.cos(moonAngle) * moonOrbitRadius,
@@ -374,12 +376,14 @@ function App() {
       const size = getPlanetSize(body.radius, body.type);
 
       // Check moons first (they're on top)
+      // Hit radius grows with zoom so moons are easier to catch when zoomed in
       if (showMoons && body.moons) {
+        const moonHitRadius = Math.max(12, 8 + zoom * 6);
         for (let moonIdx = 0; moonIdx < body.moons.length; moonIdx++) {
           const moon = body.moons[moonIdx];
           const moonPos = getMoonPosition(pos.x, pos.y, size, moon, moonIdx, time, zoom);
           const moonDist = Math.sqrt((clickX - moonPos.x) ** 2 + (clickY - moonPos.y) ** 2);
-          if (moonDist < 10) {
+          if (moonDist < moonHitRadius) {
             setSelectedBody({ body, moon, screenX: e.clientX, screenY: e.clientY });
             return;
           }
