@@ -8,11 +8,16 @@ interface SelectedBody {
   screenY: number;
 }
 
-// More realistic scale: power 0.5 keeps inner planets visible
-// while ensuring Sun-Mercury distance < Mercury-Neptune distance
-function getOrbitalRadius(distanceFromSun: number, zoom: number): number {
+// Scale functions for different modes
+function getOrbitalRadiusCompressed(distanceFromSun: number, zoom: number): number {
   if (distanceFromSun <= 0) return 0;
   return (30 + 18 * Math.pow(distanceFromSun, 0.5)) * zoom;
+}
+
+function getOrbitalRadiusReal(distanceFromSun: number, zoom: number): number {
+  if (distanceFromSun <= 0) return 0;
+  // Real proportions: 1 million km = 0.15 pixels at zoom=1
+  return distanceFromSun * 0.15 * zoom;
 }
 
 function getPlanetSize(radius: number, type: string): number {
@@ -52,12 +57,20 @@ function App() {
   const [showOrbits, setShowOrbits] = useState(true);
   const [showMoons, setShowMoons] = useState(true);
   const [showBelts, setShowBelts] = useState(true);
+  const [realScale, setRealScale] = useState(false);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
   const isDragging = useRef(false);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
   const allBodies = [SUN, ...PLANETS, ...DWARF_PLANETS];
+
+  // Wrapper that selects scale function based on mode
+  const getOrbitalRadius = useCallback((distanceFromSun: number, zoom: number): number => {
+    return realScale
+      ? getOrbitalRadiusReal(distanceFromSun, zoom)
+      : getOrbitalRadiusCompressed(distanceFromSun, zoom);
+  }, [realScale]);
 
   // Calculate position of a body at current time
   const getBodyPosition = useCallback((body: CelestialBody, centerX: number, centerY: number, currentZoom: number, time: number) => {
@@ -70,7 +83,7 @@ function App() {
       y: centerY + Math.sin(angle) * orbitRadius,
       angle
     };
-  }, [initialAngles]);
+  }, [initialAngles, getOrbitalRadius]);
 
   // Calculate moon position relative to its parent
   const getMoonPosition = useCallback((
@@ -319,7 +332,7 @@ function App() {
       }
     });
 
-  }, [offsetX, offsetY, zoom, showLabels, showOrbits, showMoons, showBelts, allBodies, getBodyPosition, getMoonPosition]);
+  }, [offsetX, offsetY, zoom, showLabels, showOrbits, showMoons, showBelts, allBodies, getBodyPosition, getMoonPosition, getOrbitalRadius]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -674,8 +687,38 @@ function App() {
         </div>
       )}
 
+      {/* Scale Mode Toggle */}
+      <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+        <button
+          onClick={() => {
+            const newMode = !realScale;
+            setRealScale(newMode);
+            // Auto-adjust zoom for better viewing
+            if (newMode) {
+              // Real scale: zoom out to see inner planets
+              setZoom(0.15);
+            } else {
+              // Compressed scale: zoom in to see all planets
+              setZoom(0.5);
+            }
+            setOffsetX(0);
+            setOffsetY(0);
+          }}
+          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+            realScale
+              ? 'bg-orange-500/30 text-orange-300 border border-orange-400/30'
+              : 'bg-blue-500/30 text-blue-300 border border-blue-400/30'
+          }`}
+        >
+          {realScale ? '🌍 Реальные пропорции' : '📏 Сжатая шкала'}
+        </button>
+        <p className="text-white/40 text-xs mt-2 text-center">
+          {realScale ? 'Внешние планеты очень далеко' : 'Все планеты видны'}
+        </p>
+      </div>
+
       {/* Legend */}
-      <div className="absolute top-16 right-4 bg-black/50 backdrop-blur-sm rounded-xl p-3 border border-white/10 text-xs">
+      <div className="absolute top-28 right-4 bg-black/50 backdrop-blur-sm rounded-xl p-3 border border-white/10 text-xs">
         <h3 className="text-white/70 font-semibold mb-2">Легенда</h3>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
